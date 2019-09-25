@@ -25,6 +25,7 @@ int numOfRegisters = 1;
 byte* BtnRegister; //SR for buttons
 
 uint32_t BtnRecord[NUM_BTNS];
+uint32_t BtnsOutgoing[NUM_BTNS];
 unsigned int CurrSRIndex = 0;
 unsigned int PressedBtnIndex = 0;
 unsigned int LastPressIndex = 0;
@@ -91,6 +92,7 @@ IPAddress MQTTIp(192,168,1,117); // IP oF the MQTT broker
 WiFiClient espClient;
 unsigned long lastMsg = 0;
 String S_msg;
+String BtnArraySend; // hold CSV of button array
 int value = 0;
 uint8_t GotMail;
 uint8_t statusCode;
@@ -150,9 +152,9 @@ void setup() {
 	pinMode(LATCH_PIN, OUTPUT);
 	pinMode(CLOCK_PIN, OUTPUT);
 	pinMode(DATA_PIN, OUTPUT);
-   pinMode(readPin1, INPUT_PULLDOWN);
-   pinMode(readPin2, INPUT_PULLDOWN);
-   Serial.println("Started");
+	pinMode(readPin1, INPUT_PULLDOWN);
+	pinMode(readPin2, INPUT_PULLDOWN);
+	Serial.println("Started");
 }
 // For toggle of led on/off
 void LedCheck(char Ckc){
@@ -180,6 +182,7 @@ void loop() {
       } 
    }
 	GotMail = MTQ.update();
+	// check status here, still test code needs work !!!!
 	if (GotMail == true){
 		Serial.print("message is: ");
 		S_msg = MTQ.GetMsg();
@@ -188,7 +191,8 @@ void loop() {
 		GotMail = false;
 	}
 	
-	// push out a message every 2 sec
+	// push out a message every 2 sec for testing remove
+	// Todo make sure to code a check status before send !!!!!
 	if (now - lastMsg > 2000) {
 		lastMsg = now;
 		++value;
@@ -196,5 +200,15 @@ void loop() {
 		Serial.print("Publish message (main): ");
 		Serial.println(S_msg);
 		statusCode = MTQ.publish(S_msg);
+		// send CSV line
+		memcpy(BtnRecord, BtnsOutgoing, NUM_BTNS);
+		BtnArraySend = "A";
+		for (size_t i = 0; i < NUM_BTNS; i++){
+			BtnArraySend = BtnArraySend + "," + String(BtnsOutgoing[i]);
+		}
+		statusCode = MTQ.publish(BtnArraySend);
+		// reset the button counter
+		for (size_t i = 0; i < NUM_BTNS; i++)
+			BtnRecord[i] = 0;
 	}
 }
