@@ -29,11 +29,14 @@ Will collect button presses into array and then send them over to server via MQT
 
 uint8_t OutPins[5] = {OUTPIN_1, OUTPIN_2, OUTPIN_3, OUTPIN_4, OUTPIN_5};
 uint8_t InPins[4] = {INPIN_1, INPIN_2, INPIN_3, INPIN_4};
+uint32_t BtnTemp[NUM_BTNS];
 uint32_t BtnRecord[NUM_BTNS];
 uint32_t BtnsOutgoing[NUM_BTNS];
 
-unsigned int CurrSRIndex = 0;
-unsigned int PressedBtnIndex = 0;
+uint32_t CurrOutPin = 0;
+uint32_t CurrInPin = 0;
+
+uint32_t PressedBtnIndex = 0;
 unsigned int LastPressIndex = 0;
 unsigned int TheButton = 0;
 
@@ -41,56 +44,32 @@ uint64_t now;
 uint64_t PasTime = 0;
 uint64_t Period1 = 5;// in mill
 
-// change pin value on SR
-/*
-void SRWrite(int pin, bool state){
-	//Determines register
-	int reg = pin / 8;
-	//Determines pin for actual register
-	int actualPin = pin - (8 * reg);
-	digitalWrite(LATCH_PIN, LOW);
-	for (int i = 0; i < numOfRegisters; i++){
-		//Get actual states for register
-		byte* states = &BtnRegister[i];
-
-		//Update state
-		if (i == reg){
-			bitWrite(*states, actualPin, state);
-		}
-
-		//Write
-	   shiftOut(DATA_PIN, CLOCK_PIN, MSBFIRST, *states);
-	}
-   digitalWrite(LATCH_PIN, HIGH);
-}
-
-
-unsigned int CheckButton()
+void CheckButton()
 {
-   uint32_t RetVal = 0;
-   LastPressIndex = PressedBtnIndex;
-   CurrSRIndex++;
-	// Step to next button in SR
-      if (CurrSRIndex >= NUM_BTNS)
-         CurrSRIndex = 1;
-      SRWrite(CurrSRIndex,true);
-	// read GPIO, if high current button is pressed
-      delayMicroseconds(15);
-      if (digitalRead(readPin1) == HIGH)
-         PressedBtnIndex = CurrSRIndex;
-      if (digitalRead(readPin2) == HIGH)
-         PressedBtnIndex = CurrSRIndex * 2;
-      //delayMicroseconds(5);
-	// Set cur button SR low again
-      SRWrite(CurrSRIndex,false);
-	// our test to see if button is pressed
-      if((LastPressIndex > 0)&&(LastPressIndex == PressedBtnIndex))
-         RetVal = PressedBtnIndex;
-      else
-         LastPressIndex = 0;
-      return RetVal;
+   	uint32_t RetVal = 0;
+   	uint32_t InPinSz = sizeof(InPins);
+   	uint32_t OutPinSz = sizeof(OutPins);
+   
+	if (CurrInPin >= InPinSz)
+		CurrInPin = 0;
+	if (CurrOutPin >= OutPinSz)
+		CurrOutPin = 0;
+ 	// Step to next button
+	delayMicroseconds(5);
+	if (digitalRead(InPins[CurrInPin]) == HIGH)
+		BtnTemp[(CurrOutPin)+(CurrInPin*OutPinSz)]++;
+	if(CurrInPin == 0)
+	{
+		digitalWrite(OutPins[CurrOutPin],HIGH);
+		if(CurrOutPin == 0)
+			digitalWrite(OutPins[OutPinSz - 1],LOW);
+		else
+			digitalWrite(OutPins[CurrOutPin - 1],LOW);
+		CurrOutPin++;
+	}
+	CurrInPin++;
 }
-*/
+
 
 //**** Wifi and MQTT stuff below *********************
 
@@ -181,18 +160,22 @@ void LedCheck(char Ckc){
 }
 // main loop
 void loop() {
-   now = millis();
+	now = millis();
    // Button check 
    if(now > (PasTime + Period1)){
       PasTime = now;
-      //TheButton = CheckButton();
-      if (TheButton > 0){
-         Serial.print("button ");  // test code
-         Serial.print(TheButton);
-         Serial.println(" Pressed !");
-		 BtnRecord[TheButton - 1]++;  //keep
-      } 
-   }
+      CheckButton();
+	  for (size_t i = 0; i < sizeof(BtnTemp); i++)
+	  {
+         if (BtnTemp[i] > 2){
+            Serial.print("button ");  // test code
+            Serial.print(i + 1);
+            Serial.println(" Pressed !");
+		      BtnRecord[TheButton - 1]++;  //keep
+            BtnTemp[i] = 0;
+         } 
+      }
+	}
 	GotMail = MTQ.update();
 	// check status here, still test code needs work !!!!
 	if (GotMail == true){
