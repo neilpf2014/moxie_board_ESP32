@@ -15,27 +15,34 @@ Will collect button presses into array and then send them over to server via MQT
 #include <WebServer.h>
 #include <WiFiManager.h>         //https://github.com/tzapu/WiFiManager
 
-#define NUM_BTNS 8 // number of button to be read
-#define LATCH_PIN GPIO_NUM_18
-#define CLOCK_PIN GPIO_NUM_12
-#define DATA_PIN GPIO_NUM_11
-int readPin1 = GPIO_NUM_19;
-int readPin2 = GPIO_NUM_21;
-int numOfRegisters = 1;
-byte* BtnRegister; //SR for buttons
+#define NUM_BTNS 20 // number of button to be read
+#define OUTPIN_1 23
+#define OUTPIN_2 22
+#define OUTPIN_3 21
+#define OUTPIN_4 19
+#define OUTPIN_5 18
+#define INPIN_1 34
+#define INPIN_2 35
+#define INPIN_3 32
+#define INPIN_4 33
 
+
+uint8_t OutPins[5] = {OUTPIN_1, OUTPIN_2, OUTPIN_3, OUTPIN_4, OUTPIN_5};
+uint8_t InPins[4] = {INPIN_1, INPIN_2, INPIN_3, INPIN_4};
 uint32_t BtnRecord[NUM_BTNS];
 uint32_t BtnsOutgoing[NUM_BTNS];
+
 unsigned int CurrSRIndex = 0;
 unsigned int PressedBtnIndex = 0;
 unsigned int LastPressIndex = 0;
 unsigned int TheButton = 0;
 
-unsigned long now;
+uint64_t now;
 uint64_t PasTime = 0;
 uint64_t Period1 = 5;// in mill
 
 // change pin value on SR
+/*
 void SRWrite(int pin, bool state){
 	//Determines register
 	int reg = pin / 8;
@@ -56,6 +63,7 @@ void SRWrite(int pin, bool state){
 	}
    digitalWrite(LATCH_PIN, HIGH);
 }
+
 
 unsigned int CheckButton()
 {
@@ -82,6 +90,7 @@ unsigned int CheckButton()
          LastPressIndex = 0;
       return RetVal;
 }
+*/
 
 //**** Wifi and MQTT stuff below *********************
 
@@ -90,7 +99,7 @@ const char* svrName = "pi-iot.local"; // if you have zeroconfig working
 IPAddress MQTTIp(192,168,1,117); // IP oF the MQTT broker
 
 WiFiClient espClient;
-unsigned long lastMsg = 0;
+uint64_t lastMsg = 0;
 String S_msg;
 String BtnArraySend; // hold CSV of button array
 int value = 0;
@@ -144,16 +153,19 @@ void setup() {
 	//Serial.println(WiFi.localIP());
 	
   //Initialize array
-   BtnRegister = new byte[numOfRegisters];
-	for (size_t i = 0; i < numOfRegisters; i++)
-	   BtnRegister[i] = 0;
+  // BtnRegister = new byte[numOfRegisters];
+//	for (size_t i = 0; i < numOfRegisters; i++)
+//	   BtnRegister[i] = 0;
 
 	//set pins to output so you can control the shift register
-	pinMode(LATCH_PIN, OUTPUT);
-	pinMode(CLOCK_PIN, OUTPUT);
-	pinMode(DATA_PIN, OUTPUT);
-	pinMode(readPin1, INPUT_PULLDOWN);
-	pinMode(readPin2, INPUT_PULLDOWN);
+	//pinMode(LATCH_PIN, OUTPUT);
+	//pinMode(CLOCK_PIN, OUTPUT);
+	//pinMode(DATA_PIN, OUTPUT);
+	for (size_t i = 0; i < 5; i++)
+		pinMode(OutPins[i], OUTPUT);
+
+	for (size_t i = 0; i < 4; i++)
+		pinMode(InPins[i], INPUT_PULLDOWN);
 	Serial.println("Started");
 }
 // For toggle of led on/off
@@ -173,7 +185,7 @@ void loop() {
    // Button check 
    if(now > (PasTime + Period1)){
       PasTime = now;
-      TheButton = CheckButton();
+      //TheButton = CheckButton();
       if (TheButton > 0){
          Serial.print("button ");  // test code
          Serial.print(TheButton);
@@ -191,9 +203,9 @@ void loop() {
 		GotMail = false;
 	}
 	
-	// push out a message every 2 sec for testing remove
+	// push out a message every 1 min for testing remove
 	// Todo make sure to code a check status before send !!!!!
-	if (now - lastMsg > 2000) {
+	if (now - lastMsg > 60000) {
 		lastMsg = now;
 		++value;
 		S_msg = "string message # " + String(value);
