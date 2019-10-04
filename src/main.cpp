@@ -16,6 +16,7 @@ Will collect button presses into array and then send them over to server via MQT
 #include <WiFiManager.h>         //https://github.com/tzapu/WiFiManager
 
 #define NUM_BTNS 20 // number of button to be read
+// all of the ESP32 pins that will be used
 #define OUTPIN_1 23
 #define OUTPIN_2 22
 #define OUTPIN_3 21
@@ -37,18 +38,18 @@ uint32_t CurrOutPin = 0;
 uint32_t CurrInPin = 0;
 
 uint32_t PressedBtnIndex = 0;
-unsigned int LastPressIndex = 0;
-unsigned int TheButton = 0;
+uint32_t LastPressIndex = 0;
 
 uint64_t now;
 uint64_t PasTime = 0;
 uint64_t Period1 = 5;// in mill
 
+// each time this is called will step though array of buttons
+// scans inputs then incr the output pins
 void CheckButton()
 {
-   	uint32_t RetVal = 0;
-   	uint32_t InPinSz = sizeof(InPins);
-   	uint32_t OutPinSz = sizeof(OutPins);
+   uint32_t InPinSz = sizeof(InPins);
+   uint32_t OutPinSz = sizeof(OutPins);
    
 	if (CurrInPin >= InPinSz)
 		CurrInPin = 0;
@@ -58,6 +59,7 @@ void CheckButton()
 	delayMicroseconds(5);
 	if (digitalRead(InPins[CurrInPin]) == HIGH)
 		BtnTemp[(CurrOutPin)+(CurrInPin*OutPinSz)]++;
+   // set next output high / current one low
 	if(CurrInPin == 0)
 	{
 		digitalWrite(OutPins[CurrOutPin],HIGH);
@@ -131,18 +133,8 @@ void setup() {
 	//Serial.println("Print IP:");
 	//Serial.println(WiFi.localIP());
 	
-  //Initialize array
-  // BtnRegister = new byte[numOfRegisters];
-//	for (size_t i = 0; i < numOfRegisters; i++)
-//	   BtnRegister[i] = 0;
-
-	//set pins to output so you can control the shift register
-	//pinMode(LATCH_PIN, OUTPUT);
-	//pinMode(CLOCK_PIN, OUTPUT);
-	//pinMode(DATA_PIN, OUTPUT);
 	for (size_t i = 0; i < 5; i++)
 		pinMode(OutPins[i], OUTPUT);
-
 	for (size_t i = 0; i < 4; i++)
 		pinMode(InPins[i], INPUT_PULLDOWN);
 	Serial.println("Started");
@@ -164,18 +156,23 @@ void loop() {
    // Button check 
    if(now > (PasTime + Period1)){
       PasTime = now;
-      CheckButton();
-	  for (size_t i = 0; i < sizeof(BtnTemp); i++)
-	  {
+      CurrInPin = 0;
+      CurrOutPin = 0;
+      // Scan all buttons once
+      for (size_t i = 0; i < NUM_BTNS; i++)
+         CheckButton();
+      // Check temp array after scan, reset if 2 hits
+	   for (size_t i = 0; i < NUM_BTNS; i++)
+	   {
          if (BtnTemp[i] > 2){
             Serial.print("button ");  // test code
             Serial.print(i + 1);
             Serial.println(" Pressed !");
-		      BtnRecord[TheButton - 1]++;  //keep
+		      BtnRecord[i]++;
             BtnTemp[i] = 0;
-         } 
-      }
-	}
+         }
+	   }
+   }
 	GotMail = MTQ.update();
 	// check status here, still test code needs work !!!!
 	if (GotMail == true){
