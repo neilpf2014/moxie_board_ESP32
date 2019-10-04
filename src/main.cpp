@@ -15,73 +15,63 @@ Will collect button presses into array and then send them over to server via MQT
 #include <WebServer.h>
 #include <WiFiManager.h>         //https://github.com/tzapu/WiFiManager
 
-#define NUM_BTNS 8 // number of button to be read
-#define LATCH_PIN GPIO_NUM_18
-#define CLOCK_PIN GPIO_NUM_12
-#define DATA_PIN GPIO_NUM_11
-int readPin1 = GPIO_NUM_19;
-int readPin2 = GPIO_NUM_21;
-int numOfRegisters = 1;
-byte* BtnRegister; //SR for buttons
+#define NUM_BTNS 20 // number of button to be read
+// all of the ESP32 pins that will be used
+#define OUTPIN_1 23
+#define OUTPIN_2 22
+#define OUTPIN_3 21
+#define OUTPIN_4 19
+#define OUTPIN_5 18
+#define INPIN_1 34
+#define INPIN_2 35
+#define INPIN_3 32
+#define INPIN_4 33
 
+
+uint8_t OutPins[5] = {OUTPIN_1, OUTPIN_2, OUTPIN_3, OUTPIN_4, OUTPIN_5};
+uint8_t InPins[4] = {INPIN_1, INPIN_2, INPIN_3, INPIN_4};
+uint32_t BtnTemp[NUM_BTNS];
 uint32_t BtnRecord[NUM_BTNS];
 uint32_t BtnsOutgoing[NUM_BTNS];
-unsigned int CurrSRIndex = 0;
-unsigned int PressedBtnIndex = 0;
-unsigned int LastPressIndex = 0;
-unsigned int TheButton = 0;
 
-unsigned long now;
+uint32_t CurrOutPin = 0;
+uint32_t CurrInPin = 0;
+
+uint32_t PressedBtnIndex = 0;
+uint32_t LastPressIndex = 0;
+
+uint64_t now;
 uint64_t PasTime = 0;
 uint64_t Period1 = 5;// in mill
 
-// change pin value on SR
-void SRWrite(int pin, bool state){
-	//Determines register
-	int reg = pin / 8;
-	//Determines pin for actual register
-	int actualPin = pin - (8 * reg);
-	digitalWrite(LATCH_PIN, LOW);
-	for (int i = 0; i < numOfRegisters; i++){
-		//Get actual states for register
-		byte* states = &BtnRegister[i];
-
-		//Update state
-		if (i == reg){
-			bitWrite(*states, actualPin, state);
-		}
-
-		//Write
-	   shiftOut(DATA_PIN, CLOCK_PIN, MSBFIRST, *states);
-	}
-   digitalWrite(LATCH_PIN, HIGH);
-}
-
-unsigned int CheckButton()
+// each time this is called will step though array of buttons
+// scans inputs then incr the output pins
+void CheckButton()
 {
-   uint32_t RetVal = 0;
-   LastPressIndex = PressedBtnIndex;
-   CurrSRIndex++;
-	// Step to next button in SR
-      if (CurrSRIndex >= NUM_BTNS)
-         CurrSRIndex = 1;
-      SRWrite(CurrSRIndex,true);
-	// read GPIO, if high current button is pressed
-      delayMicroseconds(15);
-      if (digitalRead(readPin1) == HIGH)
-         PressedBtnIndex = CurrSRIndex;
-      if (digitalRead(readPin2) == HIGH)
-         PressedBtnIndex = CurrSRIndex * 2;
-      //delayMicroseconds(5);
-	// Set cur button SR low again
-      SRWrite(CurrSRIndex,false);
-	// our test to see if button is pressed
-      if((LastPressIndex > 0)&&(LastPressIndex == PressedBtnIndex))
-         RetVal = PressedBtnIndex;
-      else
-         LastPressIndex = 0;
-      return RetVal;
+   uint32_t InPinSz = sizeof(InPins);
+   uint32_t OutPinSz = sizeof(OutPins);
+   
+	if (CurrInPin >= InPinSz)
+		CurrInPin = 0;
+	if (CurrOutPin >= OutPinSz)
+		CurrOutPin = 0;
+ 	// Step to next button
+	delayMicroseconds(5);
+	if (digitalRead(InPins[CurrInPin]) == HIGH)
+		BtnTemp[(CurrOutPin)+(CurrInPin*OutPinSz)]++;
+   // set next output high / current one low
+	if(CurrInPin == 0)
+	{
+		digitalWrite(OutPins[CurrOutPin],HIGH);
+		if(CurrOutPin == 0)
+			digitalWrite(OutPins[OutPinSz - 1],LOW);
+		else
+			digitalWrite(OutPins[CurrOutPin - 1],LOW);
+		CurrOutPin++;
+	}
+	CurrInPin++;
 }
+
 
 //**** Wifi and MQTT stuff below *********************
 
@@ -90,7 +80,7 @@ const char* svrName = "pi-iot.local"; // if you have zeroconfig working
 IPAddress MQTTIp(192,168,1,117); // IP oF the MQTT broker
 
 WiFiClient espClient;
-unsigned long lastMsg = 0;
+uint64_t lastMsg = 0;
 String S_msg;
 String BtnArraySend; // hold CSV of button array
 int value = 0;
@@ -143,17 +133,10 @@ void setup() {
 	//Serial.println("Print IP:");
 	//Serial.println(WiFi.localIP());
 	
-  //Initialize array
-   BtnRegister = new byte[numOfRegisters];
-	for (size_t i = 0; i < numOfRegisters; i++)
-	   BtnRegister[i] = 0;
-
-	//set pins to output so you can control the shift register
-	pinMode(LATCH_PIN, OUTPUT);
-	pinMode(CLOCK_PIN, OUTPUT);
-	pinMode(DATA_PIN, OUTPUT);
-	pinMode(readPin1, INPUT_PULLDOWN);
-	pinMode(readPin2, INPUT_PULLDOWN);
+	for (size_t i = 0; i < 5; i++)
+		pinMode(OutPins[i], OUTPUT);
+	for (size_t i = 0; i < 4; i++)
+		pinMode(InPins[i], INPUT_PULLDOWN);
 	Serial.println("Started");
 }
 // For toggle of led on/off
@@ -169,17 +152,26 @@ void LedCheck(char Ckc){
 }
 // main loop
 void loop() {
-   now = millis();
+	now = millis();
    // Button check 
    if(now > (PasTime + Period1)){
       PasTime = now;
-      TheButton = CheckButton();
-      if (TheButton > 0){
-         Serial.print("button ");  // test code
-         Serial.print(TheButton);
-         Serial.println(" Pressed !");
-		 BtnRecord[TheButton - 1]++;  //keep
-      } 
+      CurrInPin = 0;
+      CurrOutPin = 0;
+      // Scan all buttons once
+      for (size_t i = 0; i < NUM_BTNS; i++)
+         CheckButton();
+      // Check temp array after scan, reset if 2 hits
+	   for (size_t i = 0; i < NUM_BTNS; i++)
+	   {
+         if (BtnTemp[i] > 2){
+            Serial.print("button ");  // test code
+            Serial.print(i + 1);
+            Serial.println(" Pressed !");
+		      BtnRecord[i]++;
+            BtnTemp[i] = 0;
+         }
+	   }
    }
 	GotMail = MTQ.update();
 	// check status here, still test code needs work !!!!
@@ -191,9 +183,9 @@ void loop() {
 		GotMail = false;
 	}
 	
-	// push out a message every 2 sec for testing remove
+	// push out a message every 1 min for testing remove
 	// Todo make sure to code a check status before send !!!!!
-	if (now - lastMsg > 2000) {
+	if (now - lastMsg > 60000) {
 		lastMsg = now;
 		++value;
 		S_msg = "string message # " + String(value);
