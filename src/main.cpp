@@ -29,12 +29,22 @@ Will collect button presses into array and then send them over to server via MQT
 #define INPIN_3 32
 #define INPIN_4 33
 
+#define BTN_DELAY 500 // lockout delay in ms
+
 uint8_t OutPins[5] = {OUTPIN_1, OUTPIN_2, OUTPIN_3, OUTPIN_4, OUTPIN_5};
 uint8_t InPins[4] = {INPIN_1, INPIN_2, INPIN_3, INPIN_4};
-// used to deal with button presses
-uint32_t BtnTemp[NUM_BTNS];
+
+// used for debounce of btn array
+uint8_t BtnTemp[NUM_BTNS];
+
+// holds time in ms of last button press
+uint64_t BtnState[NUM_BTNS];
+
+// running count of recorded button presses
 uint32_t BtnRecord[NUM_BTNS];
+
 uint32_t BtnsOutgoing[NUM_BTNS];
+
 uint32_t CurrOutPin = 0;
 uint32_t CurrInPin = 0;
 
@@ -43,7 +53,12 @@ uint32_t LastPressIndex = 0;
 
 uint64_t now;
 uint64_t PasTime = 0;
+
+// Btn scan freq in mill
 uint64_t Period1 = 5;// in mill
+
+// use LED for debugging
+uint8_t LedState;
 
 // each time this is called will step though array of buttons
 // scans inputs then incr the output pins
@@ -59,7 +74,10 @@ void CheckButton()
  	// Step to next button
 	delayMicroseconds(5);
 	if (digitalRead(InPins[CurrInPin]) == HIGH)
-		BtnTemp[(CurrOutPin)+(CurrInPin*OutPinSz)]++;
+		if(BtnTemp[(CurrOutPin)+(CurrInPin*OutPinSz)] < 255)
+			BtnTemp[(CurrOutPin)+(CurrInPin*OutPinSz)]++;
+	if (digitalRead(InPins[CurrInPin]) == LOW)
+		BtnTemp[(CurrOutPin)+(CurrInPin*OutPinSz)] = 0;
    // set next output high / current one low
 	if(CurrInPin == 0)
 	{
@@ -171,6 +189,19 @@ void LedCheck(char Ckc){
 	}
 }
 
+// toggle LED for testing
+uint8_t TogLed(uint8_t state){
+   if (state < 1) {
+		digitalWrite(LED_BUILTIN, LOW);
+      state = 1;
+	}
+	else if (state > 0) {
+		digitalWrite(LED_BUILTIN, HIGH);  // Turn the LED off by making the voltage HIGH
+      state = 0;
+	}
+   return state;
+}
+
 void setup() {
 	pinMode(LED_BUILTIN, OUTPUT);     // Initialize the BUILTIN_LED pin as an output
 	Serial.begin(115200);
@@ -181,7 +212,7 @@ void setup() {
 	//Serial.println("Print IP:");
 	//Serial.println(WiFi.localIP());
 	BtnMessSuccess = false;
-   MsgSendNewPer = 0;
+   	MsgSendNewPer = 0;
 	for (size_t i = 0; i < 5; i++)
 		pinMode(OutPins[i], OUTPUT);
 	for (size_t i = 0; i < 4; i++)
@@ -203,15 +234,23 @@ void loop() {
       // Check temp array after scan, reset if 2 hits
 	   for (size_t i = 0; i < NUM_BTNS; i++)
 	   {
-         if (BtnTemp[i] > 2){
-            Serial.print("button ");  // test code
-            Serial.print(i + 1);
-            Serial.println(" Pressed !");
-		      BtnRecord[i]++;
-            BtnTemp[i] = 0;
-         }
+         if (BtnTemp[i] > 2)
+            if (BtnState[i] == 0)
+               BtnState[i] = millis(); // store curr mils of current button pressed 
 	   }
    }
+
+   // this is where we record the button press count / reset after the lockout period
+   for(size_t i = 0; i < NUM_BTNS; i++){
+      if((BtnState[i] > 0) && (now > (BtnState[i] + BTN_DELAY))){
+         Serial.print("button ");  // test code
+         Serial.print(i + 1);
+         Serial.println(" Cycled !");
+		   BtnRecord[i]++;
+         BtnState[i] = 0;
+      }
+   }
+
    // check status here, still test code needs work !!!!
 	GotMail = MTQ.update();
 	if (GotMail == true){
