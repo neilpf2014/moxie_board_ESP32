@@ -7,6 +7,8 @@ Stage version of ESP32 core and Dev version of WiFiManager (See PIO ini file)
 This now reads 20 button using 9 GPIO's
 This will become the new Fubar Moxie board control code
 Will collect button presses into array and then send them over to server via MQTT on intervals.
+
+Simplifed version with no QOS check on if the message was recv'ed
 * ****************************************************************************************************
 */
 #include <Arduino.h>
@@ -42,8 +44,6 @@ uint64_t BtnState[NUM_BTNS];
 
 // running count of recorded button presses
 uint32_t BtnRecord[NUM_BTNS];
-
-uint32_t BtnsOutgoing[NUM_BTNS];
 
 uint32_t CurrOutPin = 0;
 uint32_t CurrInPin = 0;
@@ -109,7 +109,6 @@ String BtnArraySend; // hold CSV of button array
 int value = 0;
 uint8_t GotMail;
 uint8_t statusCode;
-uint8_t BtnMessSuccess;
 uint8_t ConnectedToAP = false;
 //MQTThandler MTQ(espClient, svrName);
 MQTThandler MTQ(espClient, MQTTIp);
@@ -151,30 +150,11 @@ void WiFiCP(uint8_t ResetAP)
 // send CSV line via MQTT
 void SendNewBtnMessage(){
 	MessID = millis();
-	memcpy(BtnRecord, BtnsOutgoing, NUM_BTNS);
-		BtnArraySend = "M" + MessID;
-		for (size_t i = 0; i < NUM_BTNS; i++){
-			BtnArraySend = BtnArraySend + "," + String(BtnsOutgoing[i]);
-		}
-		statusCode = MTQ.publish(BtnArraySend);
-		// reset the button counter
-		for (size_t i = 0; i < NUM_BTNS; i++)
-			BtnRecord[i] = 0;
-		BtnMessSuccess = false;
-}
-
-uint8_t MessageTest(String test)
-{
-   String tempST;
-   uint64_t MessTest = 0;
-   if(S_msg.startsWith("M")){
-      tempST = test.substring(2);
-      MessTest = tempST.toInt();
+	BtnArraySend = "M" + MessID;
+	for (size_t i = 0; i < NUM_BTNS; i++){
+		BtnArraySend = BtnArraySend + "," + String(BtnRecord[i]);
 	}
-   if (MessTest == MessID)
-      return true;
-   else
-      return false;
+	statusCode = MTQ.publish(BtnArraySend);
 }
 
 // For toggle of led on/off
@@ -211,7 +191,6 @@ void setup() {
 	//wifiManager.autoConnect("AutoConnectAP");
 	//Serial.println("Print IP:");
 	//Serial.println(WiFi.localIP());
-	BtnMessSuccess = false;
    	MsgSendNewPer = 0;
 	for (size_t i = 0; i < 5; i++)
 		pinMode(OutPins[i], OUTPUT);
@@ -261,7 +240,6 @@ void loop() {
 		Serial.println(S_msg);
 		LedCheck(S_msg.charAt(0));
 		// ******************************************
-		BtnMessSuccess = MessageTest(S_msg);
 		GotMail = false;
 	}
 	// check every n sec to see if last message rc'ved
@@ -269,13 +247,7 @@ void loop() {
    // remove for testing 
 	if (now - lastMsg > msgPeriod) {
 		lastMsg = now;
-      MsgSendNewPer++;
-      if((BtnArraySend != "") && (!BtnMessSuccess))
-         statusCode = MTQ.publish(BtnArraySend);
-      if(BtnMessSuccess && (MsgSendNewPer > 20)){
-         SendNewBtnMessage();
-         MsgSendNewPer = 0;
-      }
+        SendNewBtnMessage();
 		//**test code to be removed ****************
 		++value;
 		S_msg = "string message # " + String(value);
@@ -283,6 +255,8 @@ void loop() {
 		Serial.println(S_msg);
 		statusCode = MTQ.publish(S_msg);
 		// ******************************************
+    }
 		
-	}
+		
+
 }
