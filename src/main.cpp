@@ -64,33 +64,23 @@ uint8_t LedState;
 // scans inputs then incr the output pins
 void CheckButton()
 {
-   uint32_t InPinSz = sizeof(InPins);
    uint32_t OutPinSz = sizeof(OutPins);
    
-	if (CurrInPin >= InPinSz)
-		CurrInPin = 0;
-	if (CurrOutPin >= OutPinSz)
-		CurrOutPin = 0;
- 	// Step to next button
+	// Step to next button
+	digitalWrite(OutPins[CurrOutPin],HIGH);
 	delayMicroseconds(5);
 	if (digitalRead(InPins[CurrInPin]) == HIGH)
 		if(BtnTemp[(CurrOutPin)+(CurrInPin*OutPinSz)] < 255)
 			BtnTemp[(CurrOutPin)+(CurrInPin*OutPinSz)]++;
 	if (digitalRead(InPins[CurrInPin]) == LOW)
 		BtnTemp[(CurrOutPin)+(CurrInPin*OutPinSz)] = 0;
-   // set next output high / current one low
-	if(CurrInPin == 0)
-	{
-		digitalWrite(OutPins[CurrOutPin],HIGH);
-		if(CurrOutPin == 0)
-			digitalWrite(OutPins[OutPinSz - 1],LOW);
-		else
-			digitalWrite(OutPins[CurrOutPin - 1],LOW);
-		CurrOutPin++;
+	digitalWrite(OutPins[CurrOutPin],LOW);
+	CurrOutPin++;
+	if(CurrOutPin >= OutPinSz){
+		CurrInPin++;
+		CurrOutPin = 0;
 	}
-	CurrInPin++;
 }
-
 
 //**** Wifi and MQTT stuff below *********************
 
@@ -238,17 +228,16 @@ void loop() {
             if (BtnState[i] == 0)
                BtnState[i] = millis(); // store curr mils of current button pressed 
 	   }
-   }
-
-   // this is where we record the button press count / reset after the lockout period
-   for(size_t i = 0; i < NUM_BTNS; i++){
-      if((BtnState[i] > 0) && (now > (BtnState[i] + BTN_DELAY))){
-         Serial.print("button ");  // test code
-         Serial.print(i + 1);
-         Serial.println(" Cycled !");
-		   BtnRecord[i]++;
-         BtnState[i] = 0;
-      }
+      // this is where we record the button press count / reset after the lockout period
+      for(size_t i = 0; i < NUM_BTNS; i++){
+         if((BtnState[i] > 0) && (now > (BtnState[i] + BTN_DELAY))){
+            Serial.print("button ");  // test code
+            Serial.print(i + 1);
+            Serial.println(" Cycled !");
+		      BtnRecord[i]++;
+            BtnState[i] = 0;
+         }
+      }  
    }
 
    // check status here, still test code needs work !!!!
