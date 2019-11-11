@@ -1,10 +1,10 @@
 # Moxie board code for ESP32
 
 For new PRS Moxieboard controler using MQTT to send teams button presses back via Wifi
-modifed to use only the MCU pins now.
+Use scan of button from array of MCU pins.
 
-No QOS dev branch
+No QOS for recpt of messages
 
-Will send a string starting with UID followed by comma separated list of button presses.  Is not going to check for anything coming back for the MQTT broker.
+Will send a string starting with M(millisecs since ESP32 Boot); followed by comma separated list of button presses.  This is not going to check for anything coming back for the MQTT broker.
 
- #*This is a WIP  -- todo fix mDNS*
+ #*mDNS works now*
