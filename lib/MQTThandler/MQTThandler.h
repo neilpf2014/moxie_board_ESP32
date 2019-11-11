@@ -40,13 +40,18 @@ class MQTThandler{
 
  public:
 	
-	// constuctor pass wifi and broker IP
+	// constuctor pass wifi and broker name ** don't use with ESP32 **
 	MQTThandler(Client& _ClWifi, const char* _serverName);
-	MQTThandler(Client& _ClWifi, IPAddress _brokerIP);
-	MQTThandler(Client& _ClWifi, IPAddress _brokerIP, uint8_t _mode, uint _bufferSz);
+
+	// constuctor pass wifi and broker IP
+	MQTThandler(Client& _ClWifi, IPAddress& _brokerIP);
+	MQTThandler(Client& _ClWifi, IPAddress& _brokerIP, uint8_t _mode, uint _bufferSz);
+
 	// need to call in main loop
 	int update();
+
 	void setClientName(String _clientName);
+	void setServerIP(IPAddress& _ServerIP);
 	void subscribeIncomming(String topic);
 	void subscribeOutgoing(String topic);
 	int publish(String message);

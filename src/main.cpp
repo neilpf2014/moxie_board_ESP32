@@ -17,6 +17,7 @@ Simplifed version with no QOS check on if the message was recv'ed
 #include <DNSServer.h>
 #include <WebServer.h>
 #include <WiFiManager.h>         //https://github.com/tzapu/WiFiManager
+#include <ESPmDNS.h>
 
 #define NUM_BTNS 20 // number of buttons to be read
 // all of the ESP32 button GPIO's 
@@ -83,8 +84,8 @@ void CheckButton()
 //**** Wifi and MQTT stuff below *********************
 
 // Update these with values suitable for the broker used.
-const char* svrName = "pi-iot.local"; // if you have zeroconfig working
-IPAddress MQTTIp(192,168,1,117); // IP oF the MQTT broker
+const char* svrName = "pi-iot"; // if you have zeroconfig working
+IPAddress MQTTIp(192,168,1,26); // IP oF the MQTT broker if not
 
 WiFiClient espClient;
 uint64_t lastMsg = 0;
@@ -98,7 +99,6 @@ int value = 0;
 uint8_t GotMail;
 uint8_t statusCode;
 uint8_t ConnectedToAP = false;
-//MQTThandler MTQ(espClient, svrName);
 MQTThandler MTQ(espClient, MQTTIp);
 
 // Wifi captive portal setup on ESP8266
@@ -116,25 +116,49 @@ void WiFiCP(uint8_t ResetAP)
 	//wifiManager.setAPCallback(configModeCallback);
 	if (ResetAP){
 		wifiManager.resetSettings();
+		wifiManager.setHostname("MoxieBoard");
 		wifiManager.autoConnect("MoxieConfigAP");
 		digitalWrite(LED_BUILTIN, LOW);
 	}
 	else
 	{
+		//wifiManager.setHostname("MoxieBoard");
 		wifiManager.autoConnect("MoxieConfigAP");
 		digitalWrite(LED_BUILTIN, LOW);
 	}
-	
-	//wifiManager.autoConnect("AutoConnectAP");
-	
+
+	// these are used for debug
 	Serial.println("Print IP:");
 	Serial.println(WiFi.localIP());
+	// **************************
 	GotMail = false;
 	MTQ.setClientName("ESP32Client");
 	MTQ.subscribeIncomming("ConfirmMsg");
 	MTQ.subscribeOutgoing("BtnsOut");
 }
 
+// use to get ip from mDNS, return true if sucess
+uint8_t mDNShelper(void){
+	uint8_t logflag = true;
+	unsigned int mdns_qu_cnt = 0;
+
+	if (!MDNS.begin("esp32whatever")){
+    	Serial.println("Error setting up MDNS responder!");
+		logflag = false;
+		}
+	else 
+    	Serial.println("Finished intitializing the MDNS client...");
+	MQTTIp = MDNS.queryHost(svrName);
+  	while ((MQTTIp.toString() == "0.0.0.0") && (mdns_qu_cnt < 10)) {
+    	Serial.println("Trying again to resolve mDNS");
+    	delay(250);
+    	MQTTIp = MDNS.queryHost(svrName);
+		mdns_qu_cnt++;
+	  }
+	  if(MQTTIp.toString() == "0.0.0.0")
+	  	logflag = false;
+	  return logflag;
+}
 // send CSV line via MQTT
 void SendNewBtnMessage(){
 	MessID = millis();
@@ -171,17 +195,27 @@ uint8_t TogLed(uint8_t state){
 }
 
 void setup() {
+	bool testIP;
+	String TempIP = MQTTIp.toString();
 	pinMode(LED_BUILTIN, OUTPUT);     // Initialize the BUILTIN_LED pin as an output
-	Serial.begin(115200);
-	WiFiCP(true);
+	Serial.begin(115200); //debug over USBserial
+	WiFiCP(false);
+	// initalize pins
 	for (size_t i = 0; i < 5; i++)
 		pinMode(OutPins[i], OUTPUT);
 	for (size_t i = 0; i < 4; i++)
 		pinMode(InPins[i], INPUT_PULLDOWN);
-	Serial.println("Started");
+	testIP = mDNShelper();
+	if (!testIP){
+		MQTTIp.fromString(TempIP);
+	}
+	Serial.print("IP address of server: ");
+	Serial.println(MQTTIp.toString());
+	MTQ.setServerIP(MQTTIp);
+	Serial.println("Started Moxie !!!!");
 }
 
-// main loop
+// main Moxie loop
 void loop() {
 	now = millis();
    // Button check 
@@ -202,9 +236,11 @@ void loop() {
 	   // this is where we record the button press count / reset after the lockout period
    	for(size_t i = 0; i < NUM_BTNS; i++){
          if((BtnState[i] > 0) && (now > (BtnState[i] + BTN_DELAY))){
-            Serial.print("button ");  // test code
+			// debug code
+            Serial.print("button ");  
             Serial.print(i + 1);
             Serial.println(" Cycled !");
+			// ***********
 		      BtnRecord[i]++;
             BtnState[i] = 0;
          }
@@ -214,7 +250,7 @@ void loop() {
 	GotMail = MTQ.update();
 	if (GotMail == true){
 
-		//**test code will blink LED on incomming****
+		//** debug code will blink LED on incomming****
 		Serial.print("message is: ");
 		S_msg = MTQ.GetMsg();
 		Serial.println(S_msg);
@@ -226,14 +262,13 @@ void loop() {
    
 	if (now - lastMsg > msgPeriod) {
 		lastMsg = now;
-      SendNewBtnMessage();
-      Serial.println(BtnArraySend);
-		//**test code to be removed ****************
+      	SendNewBtnMessage();
+		//** debug code can be removed ****************
+		Serial.println(BtnArraySend);
 		++value;
 		S_msg = "string message # " + String(value);
 		Serial.print("Publish message (main): ");
 		Serial.println(S_msg);
-      statusCode = MTQ.publish(S_msg);
 		// ******************************************
     }
 }

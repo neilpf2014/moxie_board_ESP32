@@ -54,6 +54,7 @@ void MQTThandler::reconnect(){
 }
 
 //Constructor; need ESP wifi client pointer and broker domain
+
 MQTThandler::MQTThandler(Client& _ClWifi, const char* _serverName){
 	ClWifi = &_ClWifi;
 	MQTTClient.setClient(_ClWifi);
@@ -63,7 +64,8 @@ MQTThandler::MQTThandler(Client& _ClWifi, const char* _serverName){
 	mailFlag = false;
 }
 //Constructor; need ESP wifi client pointer and broker IP address
-MQTThandler::MQTThandler(Client& _ClWifi, IPAddress _brokerIP){
+
+MQTThandler::MQTThandler(Client& _ClWifi, IPAddress& _brokerIP){
 	ClWifi = &_ClWifi;
 	brokerIP = _brokerIP;
 	MQTTClient.setClient(_ClWifi);
@@ -75,7 +77,8 @@ MQTThandler::MQTThandler(Client& _ClWifi, IPAddress _brokerIP){
 
 //Constructor for binary or text payload, mode 0 is string, 1 binary 
 // need ESP wifi client pointer and broker IP address
-MQTThandler::MQTThandler(Client & _ClWifi, IPAddress _brokerIP, uint8_t _mode, unsigned int _bufferSz)
+
+MQTThandler::MQTThandler(Client & _ClWifi, IPAddress& _brokerIP, uint8_t _mode, unsigned int _bufferSz)
 {
 	ClWifi = &_ClWifi;
 	brokerIP = _brokerIP;
@@ -94,6 +97,7 @@ MQTThandler::MQTThandler(Client & _ClWifi, IPAddress _brokerIP, uint8_t _mode, u
 
 // update will return true if a message has been recieved
 // this needs to be called evertime in main.cpp loop
+
 int MQTThandler::update(){
 	if(!MQTTClient.connected())
 		reconnect();
@@ -102,21 +106,32 @@ int MQTThandler::update(){
 }
 
 // set client Name
+
 void MQTThandler::setClientName(String _clientName){
 	ClientName = _clientName;
 }
 
+//set server IP, if it differs from what is passed in const
+
+void  MQTThandler::setServerIP(IPAddress& _ServerIP){
+		MQTTClient.setServer(_ServerIP, 1883);
+		brokerIP = _ServerIP;
+}
+
 // set topic for incomming messages
+
 void MQTThandler::subscribeIncomming(String topic){
 	InC_topic = topic;
 }
 
 // set topic for outgoing messages
+
 void MQTThandler::subscribeOutgoing(String topic){
 	Out_topic = topic;
 }
 
 // publish an outgoing message
+
 int MQTThandler::publish(String message){
 	if (!MQTTClient.connected()) {
 		reconnect();
@@ -126,6 +141,7 @@ int MQTThandler::publish(String message){
 }
 
 // return any recived messages
+
 String MQTThandler::GetMsg(){
 	String RetVal;
 	if (mailFlag){
@@ -138,6 +154,7 @@ String MQTThandler::GetMsg(){
 }
 
 // Get connection status message, for debug mostly
+
 String MQTThandler::GetConStatus(){
 	return ConStatus;
 }

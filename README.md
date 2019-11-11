@@ -7,4 +7,4 @@ No QOS dev branch
 
 Will send a string starting with UID followed by comma separated list of button presses.  Is not going to check for anything coming back for the MQTT broker.
 
- #*This is a WIP*
+ #*This is a WIP  -- todo fix mDNS*
