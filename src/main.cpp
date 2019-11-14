@@ -1,5 +1,5 @@
 /* ***************************************************************************************************
-NF 2019-09-24
+NF 2019-11-14
 
 Mashup of code from ESP8266 MQTT example --  rewritten from pub sub example to use the wrapper class
 MQTThandler.  Since this is running on ESP32, will need to use
@@ -31,6 +31,10 @@ Simplifed version with no QOS check on if the message was recv'ed
 #define INPIN_2 35
 #define INPIN_3 32
 #define INPIN_4 33
+#define INPIN_7 25 // # 21 - 25 on board
+#define INPIN_8 26 // # 26 - 30 on board
+#define INPIN_5 36 // # 31 - 35 on board
+#define INPIN_6	39 // # 35 - 40 on board
 
 #define BTN_DELAY 2500 // lockout delay in ms
 
@@ -57,6 +61,8 @@ uint64_t Period1 = 5;// in mill
 
 // use LED for debugging
 uint8_t LedState;
+uint64_t LedOnTime = 0;
+uint64_t LedOnPer = 500;
 
 // each time this is called will step though array of buttons
 // scans inputs then incr the output pins
@@ -118,13 +124,11 @@ void WiFiCP(uint8_t ResetAP)
 		wifiManager.resetSettings();
 		wifiManager.setHostname("MoxieBoard");
 		wifiManager.autoConnect("MoxieConfigAP");
-		digitalWrite(LED_BUILTIN, LOW);
 	}
 	else
 	{
 		//wifiManager.setHostname("MoxieBoard");
 		wifiManager.autoConnect("MoxieConfigAP");
-		digitalWrite(LED_BUILTIN, LOW);
 	}
 
 	// these are used for debug
@@ -201,6 +205,7 @@ void setup() {
 	Serial.begin(115200); //debug over USBserial
 	WiFiCP(false);
 	// initalize pins
+	pinMode(LED_BUILTIN,OUTPUT);
 	for (size_t i = 0; i < 5; i++)
 		pinMode(OutPins[i], OUTPUT);
 	for (size_t i = 0; i < 4; i++)
@@ -213,6 +218,9 @@ void setup() {
 	Serial.println(MQTTIp.toString());
 	MTQ.setServerIP(MQTTIp);
 	Serial.println("Started Moxie !!!!");
+	LedState = 1;
+	LedState = TogLed(LedState);
+	LedOnTime = millis();
 }
 
 // main Moxie loop
@@ -231,13 +239,13 @@ void loop() {
 	   {
          if (BtnTemp[i] > 2)
             if (BtnState[i] == 0)
-               BtnState[i] = millis(); // store curr mils of current button pressed 
+            	BtnState[i] = millis(); // store curr mils of current button pressed 
 	   }
 	   // this is where we record the button press count / reset after the lockout period
    	for(size_t i = 0; i < NUM_BTNS; i++){
          if((BtnState[i] > 0) && (now > (BtnState[i] + BTN_DELAY))){
 			// debug code
-            Serial.print("button ");  
+			Serial.print("button ");  
             Serial.print(i + 1);
             Serial.println(" Cycled !");
 			// ***********
@@ -262,6 +270,9 @@ void loop() {
    
 	if (now - lastMsg > msgPeriod) {
 		lastMsg = now;
+		LedState = 1;
+		LedState = TogLed(LedState);
+		LedOnTime = millis();
       	SendNewBtnMessage();
 		//** debug code can be removed ****************
 		Serial.println(BtnArraySend);
@@ -271,4 +282,9 @@ void loop() {
 		Serial.println(S_msg);
 		// ******************************************
     }
+	if (LedOnTime + LedOnPer < now){
+		LedState = 0;
+		LedState = TogLed(LedState);
+		LedOnTime = 0;
+	}
 }
