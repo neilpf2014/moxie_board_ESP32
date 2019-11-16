@@ -4,6 +4,7 @@
 .vscode/launch.json
 .vscode/ipch
 .vscode
+.thumbs
 /include
 /test
 /lib/README
