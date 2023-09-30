@@ -458,7 +458,7 @@ void setup() {
 	Serial.println(MQTTIp.toString());
 	MTQ.setServerIP(MQTTIp);
 	*/
-	delay(1000)
+	delay(1000);
 	Serial.println("Started Moxie !!!!");
 	LedState = 1;
 	LedState = TogLed(LedState);
