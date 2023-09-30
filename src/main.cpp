@@ -40,7 +40,7 @@ Simplifed version with no QOS check on if the message was recv'ed
 #define INPIN_6	39 // # 35 - 40 on board
 
 #define BTN_DELAY 2500 // lockout delay in ms
-#define DEBUG_ON 1
+#define DEBUG_ON 0
 
 #define AP_DELAY 5000
 #define HARD_CODE_BROKER "192.168.1.140"
@@ -300,6 +300,7 @@ void WiFiCP(WiFiManager &WFM)
   String sIPaddr;
   IPAddress MQTTeIP;
 
+
   WFM.setSaveConfigCallback(saveConfigCallback);
   WFM.setAPCallback(configModeCallback);
   replaceHCIP = false;
@@ -310,7 +311,7 @@ void WiFiCP(WiFiManager &WFM)
   if (isConnected)
   {
     DBG("Connected");
-    //loadedFile = GetConfData();
+    loadedFile = GetConfData();
     // load from file ignore TB
     if (!Use_def_IP_flag)
     {
@@ -351,11 +352,15 @@ void WiFiConf(uint8_t ResetAP)
   WiFiManager wifiManager;
   if (ResetAP)
   {
+    DBG("catch2a");
     wifiManager.resetSettings();
     WiFiCP(wifiManager);
   }
   else
+  {
+    DBG("catch2");
     WiFiCP(wifiManager);
+  }
   // these are used for debug
   Serial.println("Print IP:");
   Serial.println(WiFi.localIP());
@@ -407,9 +412,9 @@ uint8_t TogLed(uint8_t state){
 void IOTsetup()
 {
   bool testIP;
-  int btnSta;
+  int btnSta = LOW;
   uint64_t APmodeCKtimer;
-  uint8_t Btnstate;
+  uint8_t Btnstate = 0;
   uint8_t tempint;
   APmodeCKtimer = millis();
   Btnstate = 0;
@@ -420,7 +425,10 @@ void IOTsetup()
   {
 	btnSta = digitalRead(INPIN_1);
 	if (btnSta == HIGH)
-      Btnstate = 1;
+    {
+        DBG("TEST_1a");
+        Btnstate = 1;
+    }
   }
   String TempIP = MQTTIp.toString();
   // these lines set up the access point, mqtt & other internet stuff
@@ -447,12 +455,12 @@ void setup() {
 	Serial.begin(115200); //debug over USBserial
 	//WiFiCP(false);
 	// initalize pins
-	pinMode(LED_BUILTIN,OUTPUT);
+	//pinMode(LED_BUILTIN,OUTPUT);
 	for (size_t i = 0; i < 5; i++)
 		pinMode(OutPins[i], OUTPUT);
 	for (size_t i = 0; i < 4; i++)
 		pinMode(InPins[i], INPUT_PULLDOWN);
-	void IOTsetup();
+	IOTsetup();
 	/*
 	testIP = mDNShelper();
 	if (!testIP){
