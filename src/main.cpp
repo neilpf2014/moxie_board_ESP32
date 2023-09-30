@@ -37,6 +37,12 @@ Simplifed version with no QOS check on if the message was recv'ed
 #define INPIN_6	39 // # 35 - 40 on board
 
 #define BTN_DELAY 2500 // lockout delay in ms
+#define DEBUG_ON 0
+
+byte debugMode;
+
+#define DBG(...) debugMode == DEBUG_ON ? Serial.println(__VA_ARGS__) : NULL
+
 
 uint8_t OutPins[5] = {OUTPIN_1, OUTPIN_2, OUTPIN_3, OUTPIN_4, OUTPIN_5};
 uint8_t InPins[4] = {INPIN_1, INPIN_2, INPIN_3, INPIN_4};
