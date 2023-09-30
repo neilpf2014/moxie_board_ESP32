@@ -28,6 +28,7 @@ class MQTThandler{
 	uint8_t mode; // 0 for string, 1 for binary
 	String ClientName;
 	uint8_t mailFlag;
+	uint32_t Connected;
 	IPAddress brokerIP;
 	// non blocking timer
 	unsigned long CurTime;
@@ -57,6 +58,7 @@ class MQTThandler{
 	int publish(String message);
 	String GetMsg();
 	String GetConStatus();
+	uint32_t isConnected();
 };
 
 

@@ -42,7 +42,7 @@ Simplifed version with no QOS check on if the message was recv'ed
 #define BTN_DELAY 2500 // lockout delay in ms
 #define DEBUG_ON 1
 
-#define AP_DELAY 2000
+#define AP_DELAY 5000
 #define HARD_CODE_BROKER "192.168.1.140"
 #define CONFIG_FILE "/svr-config.json"
 
@@ -185,7 +185,7 @@ uint8_t mDNShelper(void){
 // New Wifi code here
 // IPAddress MQTTIp(192, 168, 1, 140); // IP oF the MQTT broker if not 192.168.1.183
 const char* svrName = "pi-iot"; // if you have zeroconfig working
-IPAddress MQTTIp(192,168,1,26); // IP oF the MQTT broker if not
+IPAddress MQTTIp(192,168,1,144); // IP oF the MQTT broker if not
 
 WiFiClient espClient;
 uint64_t lastMsg = 0;
@@ -200,7 +200,7 @@ int value = 0;
 uint8_t GotMail;
 uint8_t statusCode;
 bool SaveConf_flag = false;
-bool Use_def_IP_flag = false;
+bool Use_def_IP_flag = true;
 
 uint8_t ConnectedToAP = false;
 MQTThandler MTQ(espClient, MQTTIp);
@@ -231,7 +231,10 @@ uint8_t GetConfData(void)
       }
     }
     else
+    {
       DBG("File_not_found");
+      retVal = 0;
+    }
   }
   return retVal;
 }
@@ -292,7 +295,7 @@ void WiFiCP(WiFiManager &WFM)
   bool validIP;
   uint8_t loadedFile;
   uint8_t savedFile;
-  uint8_t isConnected;
+  bool isConnected;
   bool replaceHCIP;
   String sIPaddr;
   IPAddress MQTTeIP;
@@ -307,7 +310,7 @@ void WiFiCP(WiFiManager &WFM)
   if (isConnected)
   {
     DBG("Connected");
-    loadedFile = GetConfData();
+    //loadedFile = GetConfData();
     // load from file ignore TB
     if (!Use_def_IP_flag)
     {
@@ -371,7 +374,8 @@ void SendNewBtnMessage(){
 	for (size_t i = 0; i < NUM_BTNS; i++){
 		BtnArraySend = BtnArraySend + "," + String(BtnRecord[i]);
 	}
-	statusCode = MTQ.publish(BtnArraySend);
+  if (MTQ.isConnected() == 1)
+	  statusCode = MTQ.publish(BtnArraySend);
 }
 
 // For toggle of led on/off

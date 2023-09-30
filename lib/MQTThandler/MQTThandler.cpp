@@ -42,6 +42,7 @@ void MQTThandler::reconnect(){
 		if (MQTTClient.connect(ClientName.c_str())) {
 			ConStatus = ConStatus + "connected";
 			MQTTClient.subscribe(InC_topic.c_str());
+			Connected = 1;
 		}
 		else {
 			ConStatus = ConStatus + "failed, rc="; //debug
@@ -49,6 +50,7 @@ void MQTThandler::reconnect(){
 			ConStatus = ConStatus + "\ntry again in 5 seconds"; //debug
 			// Wait 5 seconds before retrying
 			pastTime = CurTime;
+			Connected = 0;
 		}
 	}
 }
@@ -157,4 +159,8 @@ String MQTThandler::GetMsg(){
 
 String MQTThandler::GetConStatus(){
 	return ConStatus;
+}
+
+uint32_t MQTThandler::isConnected(){
+	return Connected;
 }
